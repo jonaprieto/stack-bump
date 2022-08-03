@@ -1,27 +1,33 @@
 module StackBump.Spinner where
 
-import           Control.Concurrent
-import           Control.Concurrent.Async
-import           Control.Monad
-import           Data.Monoid
-import           System.Console.ANSI
-import           System.Exit
-import           System.IO                (BufferMode (NoBuffering), hFlush,
-                                           hPutStrLn, hSetBuffering, stderr,
-                                           stdout)
-import           System.IO.Unsafe
-import           System.Process
+import Control.Concurrent
+import Control.Concurrent.Async
+import Control.Monad
+import System.Console.ANSI
+import System.Exit
+import System.IO
+  ( BufferMode (NoBuffering),
+    hFlush,
+    hPutStrLn,
+    hSetBuffering,
+    stderr,
+    stdout,
+  )
+import System.IO.Unsafe
+import System.Process
 
 spinner :: Int -> String
 spinner i = (states !! (i `mod` l)) : ""
   where
+    states :: String
     states = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+    l :: Int
     l = length states
 
 counter :: MVar Int
 counter = unsafePerformIO (newMVar 0)
-
 {-# NOINLINE counter #-}
+
 displaySpinner :: String -> Async () -> IO ()
 displaySpinner title action = do
   hSetBuffering stdout NoBuffering
@@ -33,14 +39,14 @@ displaySpinner title action = do
   putStr "⠋"
   a <-
     async $
-    forever $ do
-      currentCount <- modifyMVar counter (\i -> return (i + 1, i))
-      cursorBackward 1
-      setSGR
-        [SetColor Foreground Vivid Magenta, SetConsoleIntensity BoldIntensity]
-      putStr (spinner currentCount)
-      hFlush stdout
-      threadDelay (50 * 1000)
+      forever $ do
+        currentCount <- modifyMVar counter (\i -> return (i + 1, i))
+        cursorBackward 1
+        setSGR
+          [SetColor Foreground Vivid Magenta, SetConsoleIntensity BoldIntensity]
+        putStr (spinner currentCount)
+        hFlush stdout
+        threadDelay (50 * 1000)
   wait action
   cancel a
   clearLine
@@ -48,8 +54,9 @@ displaySpinner title action = do
 
 runProcessWithSpinner :: String -> IO ()
 runProcessWithSpinner title =
-  let (c:args) = words title
-  in runProcessWithSpinnerRaw title c args
+  case words title of
+    (c : args) -> runProcessWithSpinnerRaw title c args
+    _ -> exitFailure
 
 runProcessWithSpinnerRaw :: String -> String -> [String] -> IO ()
 runProcessWithSpinnerRaw title c args = do

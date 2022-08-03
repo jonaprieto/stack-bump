@@ -22,3 +22,5 @@ cabal.sandbox.config
 .stack-work/
 cabal.project.local
 stack-bump.cabal
+.hie
+stack.yaml.lock

@@ -1,6 +1,6 @@
 module Main where
 
-import qualified StackBump.Main as StackBump
+import StackBump.Main qualified as StackBump
 
 main :: IO ()
 main = StackBump.main

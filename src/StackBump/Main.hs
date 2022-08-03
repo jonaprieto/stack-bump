@@ -1,28 +1,23 @@
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 module StackBump.Main where
 
-import           Prelude               hiding (readFile)
-
-import           Control.Lens          hiding ((.=))
-import           Control.Monad
-import           Data.Aeson.Lens
-import qualified Data.ByteString.Char8 as ByteString (pack, unpack)
-import           Data.List
-import           Data.Maybe
-import           Data.Monoid
-import qualified Data.Text             as Text
-import           Data.Yaml
-import           System.Console.ANSI
-import           System.Environment
-import           System.Exit
-import           System.FilePath
-import           System.FilePath.Glob
-import           System.IO.Strict
-import           Text.Read
-
-import           StackBump.Spinner
+import Control.Lens hiding ((.=))
+import Control.Monad
+import Data.Aeson.Lens
+import Data.ByteString.Char8 qualified as ByteString (pack, unpack)
+import Data.List
+import Data.Maybe
+import Data.Monoid
+import Data.Text qualified as Text
+import Data.Yaml
+import StackBump.Spinner
+import System.Console.ANSI
+import System.Environment
+import System.Exit
+import System.FilePath
+import System.FilePath.Glob
+import System.IO.Strict
+import Text.Read
+import Prelude hiding (readFile)
 
 data BumpType
   = BumpTypeOther Int
@@ -31,21 +26,22 @@ data BumpType
   | BumpTypeMajor
   deriving (Show, Eq)
 
-data Options = Options { optsBumpType :: BumpType
-                       , optsVerify   :: Bool
-                       }
+data Options = Options
+  { optsBumpType :: BumpType,
+    optsVerify :: Bool
+  }
 
-data Package =
-  Package String
+data Package
+  = Package String
 
 bumpPackage :: BumpType -> IO (Either String (String, String))
 bumpPackage bt = do
-  !pkg <- lines <$> readFile "package.yaml"
+  ~pkg <- lines <$> readFile "package.yaml"
   let mi = findIndex ("version" `isPrefixOf`) pkg
   case mi of
     Nothing -> return (Left "No `version` to bump")
     Just i -> do
-      let (p, versionStr:ps) = splitAt i pkg -- Partial, but can't be
+      let (p, versionStr : ps) = splitAt i pkg -- Partial, but can't be
           ev = decodeEither (ByteString.pack versionStr) :: Either String Value
           vstring = ev ^. _Right . key "version" . _String
           vstringS = map Text.unpack (Text.split (== '.') vstring)
@@ -55,45 +51,48 @@ bumpPackage bt = do
         Right bv -> do
           let packageYaml' =
                 unlines
-                  (p <>
-                   [ init
-                       (ByteString.unpack (encode (object ["version" .= bv])))
-                   ] <>
-                   ps)
+                  ( p
+                      <> [ init
+                             (ByteString.unpack (encode (object ["version" .= bv])))
+                         ]
+                      <> ps
+                  )
           return (Right (packageYaml', bv))
 
 bump :: BumpType -> [String] -> Either String [String]
-bump BumpTypeMajor (n:ns) =
-  (: map (const "0") ns) . show . (+ (1 :: Int)) <$> readEither n
-bump BumpTypeMajor _ = Left "Can't major bump"
-bump BumpTypeMinor (n1:n:ns) = (\x -> n1:x:map (const "0") ns) . show . (+(1 :: Int)) <$> readEither n
-bump BumpTypeMinor _ = Left "Can't minor bump"
-bump BumpTypePatch (n1:n2:n:ns) =
-  (\x -> n1 : n2 : x : map (const "0") ns) . show . (+ (1 :: Int)) <$>
-  readEither n
-bump BumpTypePatch _ = Left "Can't patch bump"
-bump (BumpTypeOther c) ns =
-  if c >= length ns
-    then Left ("Can't bump " <> show c <> " component")
-    else let (n1, n:n2) = splitAt c ns
-         in (\x -> n1 <> (x : map (const "0") n2)) . show . (+ (1 :: Int)) <$>
-            readEither n
+bump = \case
+  BumpTypeMajor -> \case
+    (n : ns) -> (: map (const "0") ns) . show . (+ (1 :: Int)) <$> readEither n
+    _ -> Left "Can't major bump"
+  BumpTypeMinor -> \case
+    (n1 : n : ns) -> (\x -> n1 : x : map (const "0") ns) . show . (+ (1 :: Int)) <$> readEither n
+    _ -> Left "Can't minor bump"
+  BumpTypePatch -> \case
+    (n1 : n2 : n : ns) -> (\x -> n1 : n2 : x : map (const "0") ns) . show . (+ (1 :: Int)) <$> readEither n
+    _ -> Left "Can't patch bump"
+  _ -> \_ -> Left "No implemented"
+
+-- if c >= length ns
+--   then Left ("Can't bump " <> show c <> " component")
+--   else let (n1, n:n2) = splitAt c ns
+--       in (\x -> n1 <> (x : map (const "0") n2)) . show . (+ (1 :: Int)) <$>
+--           readEither n
 
 readOptions :: [String] -> Either String Options
 readOptions as = do
   bt <-
     case as of
-      ["other"]     -> Left usage
-      ("other":x:_) -> BumpTypeOther <$> readEither x
-      ("patch":_)   -> Right BumpTypePatch
-      ("minor":_)   -> Right BumpTypeMinor
-      ("major":_)   -> Right BumpTypeMajor
-      _             -> Left usage
+      ["other"] -> Left usage
+      ("other" : x : _) -> BumpTypeOther <$> readEither x
+      ("patch" : _) -> Right BumpTypePatch
+      ("minor" : _) -> Right BumpTypeMinor
+      ("major" : _) -> Right BumpTypeMajor
+      _ -> Left usage
   let verify =
         case as of
-          (_:"-v":_)       -> True
-          (_:"--verify":_) -> True
-          _                -> False
+          (_ : "-v" : _) -> True
+          (_ : "--verify" : _) -> True
+          _ -> False
   return $ Options bt verify
 
 runTasks :: String -> IO a -> IO ()
@@ -112,7 +111,7 @@ runTasks title action = do
   putStrLn (" " <> title)
 
 run :: Options -> IO ()
-run Options{..} = do
+run Options {..} = do
   ev <- bumpPackage optsBumpType
   case ev of
     Left e -> error e
@@ -132,7 +131,7 @@ run Options{..} = do
         mcabalFile <- findCabalfile
         case mcabalFile of
           Just cabalFile -> runProcessWithSpinner ("git add " <> cabalFile)
-          Nothing        -> return ()
+          Nothing -> return ()
         runProcessWithSpinnerRaw
           "git commit -m ..."
           "git"
@@ -167,5 +166,5 @@ main = do
     putStrLn usage
     exitSuccess
   case readOptions as of
-    Left err   -> error err
+    Left err -> error err
     Right opts -> run opts

@@ -1,20 +1,17 @@
 name: stack-bump
-version: '0.7.1.0'
+version: '0.7.2.0'
 category: Development
-author: Pedro Tacla Yamada
-synopsis: 'Dead simple version bumping for hpack packages'
+author: Pedro Tacla Yamada, Jonathan Prieto-Cubides
+synopsis: 'Tool for bumping HPack packages'
 description: '
 Runs tests and build with stack, then bumps the package with a tagged commit.
 '
-maintainer: tacla.yamada@gmail.com
 license: MIT
-homepage: https://github.com/yamadapc/stack-bump
-
-extra-source-files:
-- ChangeLog.md
+homepage: https://github.com/jonaprieto/stack-bump
+tested-with:     ghc == 9.2.3
 
 dependencies:
-- base >=4.8 && <4.9
+- base
 - optparse-applicative
 - yaml
 - lens
@@ -27,6 +24,39 @@ dependencies:
 - ansi-terminal
 - Glob
 - filepath
+
+ghc-options:
+# Warnings
+- -Weverything
+- -Wno-all-missed-specialisations
+- -Wno-missing-export-lists
+- -Wno-missing-import-lists
+- -Wno-missing-kind-signatures
+- -Wno-missing-safe-haskell-mode
+- -Wno-safe
+- -Wno-unsafe
+- -Wno-unused-packages
+# HIE Support
+- -fhide-source-paths
+- -fwrite-ide-info -hiedir=.hie
+# Polysemy Support
+- -O2 -flate-specialise -fspecialise-aggressively
+
+default-extensions:
+- ApplicativeDo
+- DataKinds
+- DerivingStrategies
+- GADTs
+- GeneralizedNewtypeDeriving
+- ImportQualifiedPost
+- LambdaCase
+- MultiWayIf
+- NoFieldSelectors
+- ImplicitPrelude
+- OverloadedStrings
+- RecordWildCards
+- TemplateHaskell
+- TypeFamilyDependencies
 
 executables:
   stack-bump:
