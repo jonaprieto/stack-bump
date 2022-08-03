@@ -4,7 +4,7 @@ import Control.Lens hiding ((.=))
 import Control.Monad
 import Data.Aeson.Lens
 import Data.ByteString.Char8 qualified as ByteString (pack, unpack)
-import Data.List
+import Data.List qualified as List
 import Data.Maybe
 import Data.Monoid
 import Data.Text qualified as Text
@@ -24,7 +24,7 @@ data BumpType
   | BumpTypePatch
   | BumpTypeMinor
   | BumpTypeMajor
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 data Options = Options
   { optsBumpType :: BumpType,
@@ -37,15 +37,16 @@ data Package
 bumpPackage :: BumpType -> IO (Either String (String, String))
 bumpPackage bt = do
   ~pkg <- lines <$> readFile "package.yaml"
-  let mi = findIndex ("version" `isPrefixOf`) pkg
+  let mi = List.findIndex ("version" `List.isPrefixOf`) pkg
   case mi of
     Nothing -> return (Left "No `version` to bump")
     Just i -> do
+      -- TODO: use NonEmptyList instead
       let (p, versionStr : ps) = splitAt i pkg -- Partial, but can't be
           ev = decodeEither (ByteString.pack versionStr) :: Either String Value
           vstring = ev ^. _Right . key "version" . _String
           vstringS = map Text.unpack (Text.split (== '.') vstring)
-          ebv = intercalate "." <$> bump bt vstringS
+          ebv = List.intercalate "." <$> bump bt vstringS
       case ebv of
         Left e -> return (Left e)
         Right bv -> do
@@ -70,13 +71,14 @@ bump = \case
   BumpTypePatch -> \case
     (n1 : n2 : n : ns) -> (\x -> n1 : n2 : x : map (const "0") ns) . show . (+ (1 :: Int)) <$> readEither n
     _ -> Left "Can't patch bump"
-  _ -> \_ -> Left "No implemented"
+  BumpTypeOther c -> \ns -> 
+    if | c >= length ns -> Left ("Can't bump " <> show c <> " component")
+       | otherwise -> 
+          case splitAt c ns of
+            (n1, n:n2) -> (\x -> n1 <> (x : map (const "0") n2)) . show . (+ (1 :: Int)) <$>
+              readEither n
+            _ -> Left "Unexpected case."
 
--- if c >= length ns
---   then Left ("Can't bump " <> show c <> " component")
---   else let (n1, n:n2) = splitAt c ns
---       in (\x -> n1 <> (x : map (const "0") n2)) . show . (+ (1 :: Int)) <$>
---           readEither n
 
 readOptions :: [String] -> Either String Options
 readOptions as = do
@@ -149,7 +151,7 @@ findCabalfile = do
     Just gitIgnore -> do
       gitIgnoreC <- lines <$> readFile gitIgnore
       let ignoringCabalFile =
-            isJust $ find ((== ".cabal") . takeExtension) gitIgnoreC
+            isJust $ List.find ((== ".cabal") . takeExtension) gitIgnoreC
       if ignoringCabalFile
         then return Nothing
         else findCabalfile'

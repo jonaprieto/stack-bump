@@ -1,0 +1,7 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "stack-bump:lib"
+
+    - path: "./test"
+      component: "stack-bump:test:stack-bump-test"
